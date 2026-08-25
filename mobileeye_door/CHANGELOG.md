@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.5
+
+- Enable real WebRTC (sub-second latency) instead of the MSE fallback. WebRTC
+  needs a reachable ICE candidate, but go2rtc in the add-on only sees the
+  container IP. New `webrtc_ip` option: set it to your HA host IP and the
+  add-on advertises `<ip>:8555` (port now mapped to the host). Leave it empty
+  and players use MSE as before.
+
 ## 1.0.4
 
 - Preload every stream at startup (`preload:` section) so go2rtc keeps each

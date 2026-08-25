@@ -1,6 +1,6 @@
 ---
 name: MobileEyeDoor Bridge
-version: "1.0.4"
+version: "1.0.5"
 slug: mobileeye_door
 description: >-
   Live video from CTV / XiongMai video doorbells (MobileEyeDoor+ / uCareHome,
@@ -18,13 +18,16 @@ map:
 ports:
   8554/tcp: 8554
   1984/tcp: 1984
+  8555/tcp: 8555
 ports_description:
   8554/tcp: RTSP streams (rtsp://<host>:8554/<camera>)
   1984/tcp: go2rtc web UI / API
+  8555/tcp: WebRTC media (TCP) — needs webrtc_ip set
 options:
   host: ""
   port: 10510
   login_hex: ""
+  webrtc_ip: ""
   cameras:
     - channel: 1
       name: doorbell
@@ -32,6 +35,7 @@ schema:
   host: str
   port: port
   login_hex: password
+  webrtc_ip: "str?"
   cameras:
     - channel: list(1|2|3|4)
       name: str

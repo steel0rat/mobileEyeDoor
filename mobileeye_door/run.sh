@@ -17,6 +17,20 @@ export DOORBELL_HOST="${HOST}"
 export DOORBELL_PORT="${PORT}"
 export LOGIN_HEX="${LOGIN_HEX}"
 
+# WebRTC needs an ICE candidate the browser can actually reach. go2rtc inside
+# the add-on only sees the container IP (172.30.x), which no browser can dial,
+# so the user supplies the HA host IP via webrtc_ip and we advertise it on
+# :8555 (the port mapped to the host). Without it WebRTC can't connect and
+# players fall back to slower MSE.
+WEBRTC_IP="$(bashio::config 'webrtc_ip')"
+if bashio::var.has_value "${WEBRTC_IP}"; then
+    WEBRTC_CANDIDATES=$'  candidates:\n    - '"${WEBRTC_IP}:8555"
+    bashio::log.info "WebRTC candidate: ${WEBRTC_IP}:8555"
+else
+    WEBRTC_CANDIDATES=""
+    bashio::log.warning "webrtc_ip not set — WebRTC off, players fall back to MSE"
+fi
+
 CONFIG="/tmp/go2rtc.yaml"
 cat > "${CONFIG}" <<EOF
 log:
@@ -27,6 +41,7 @@ rtsp:
   listen: ":8554"
 webrtc:
   listen: ":8555"
+${WEBRTC_CANDIDATES}
 streams:
 EOF
 
