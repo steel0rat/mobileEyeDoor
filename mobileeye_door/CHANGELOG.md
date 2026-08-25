@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.2
+
+- Re-encode each stream with a 1s keyframe interval (`-g 25`) instead of
+  `-c:v copy`. The doorbell emits an IDR only about once every ~28s, so
+  snapshots and Home Assistant camera previews used to stall past their
+  timeouts (HTTP 500). Keyframes now arrive every second and previews load
+  immediately.
+
 ## 1.0.1
 
 - Fix H.264 corruption ("grey mush", decode errors): NAL units that straddle

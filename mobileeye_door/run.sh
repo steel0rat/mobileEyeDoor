@@ -31,14 +31,18 @@ streams:
 EOF
 
 # One go2rtc stream per configured camera. ctv_client emits H.264 Annex-B on
-# stdout, ffmpeg wraps it and pushes into the go2rtc RTSP listener ({output}).
+# stdout, ffmpeg re-encodes it and pushes into the go2rtc RTSP listener
+# ({output}). We can't `-c:v copy`: the doorbell emits a keyframe only about
+# once every ~28s (huge GOP), so snapshots and any consumer that must wait for
+# an IDR would stall past their timeouts. Re-encoding with -g 25 forces one
+# keyframe per second — snapshots and previews become instant.
 for i in $(bashio::config 'cameras|keys'); do
     CH="$(bashio::config "cameras[${i}].channel")"
     NAME="$(bashio::config "cameras[${i}].name")"
     bashio::log.info "Camera '${NAME}' -> doorbell channel ${CH}"
     {
         echo "  ${NAME}:"
-        echo "    - \"exec:bash -c 'python3 /ctv_client.py --channel ${CH} | ffmpeg -hide_banner -loglevel error -fflags nobuffer -f h264 -i - -c:v copy -rtsp_transport tcp -f rtsp {output}'#killsignal=15\""
+        echo "    - \"exec:bash -c 'python3 /ctv_client.py --channel ${CH} | ffmpeg -hide_banner -loglevel error -fflags nobuffer -f h264 -i - -c:v libx264 -preset ultrafast -tune zerolatency -pix_fmt yuv420p -g 25 -keyint_min 25 -sc_threshold 0 -an -rtsp_transport tcp -f rtsp {output}'#killsignal=15\""
     } >> "${CONFIG}"
 done
 
