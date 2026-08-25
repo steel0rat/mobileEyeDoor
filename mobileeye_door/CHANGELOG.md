@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.11
+
+- Fix 1.0.10 breaking the door-panel channels. XiongMai frames video
+  differently per channel: the yard camera glues its media header onto a NAL
+  tail, but the panels send whole wrapper NALs (type 20). The 1.0.10 split on
+  `02 00 00 00` only worked for the yard and starved the others. Now the client
+  splits on H.264 start codes, trims any glued XiongMai header off each NAL, and
+  keeps only real H.264 types — clean video on all four channels (verified 2.9-
+  3.4 fps each).
+
 ## 1.0.10
 
 - Fix the real cause of the periodic multi-second freezes: the client demuxed
