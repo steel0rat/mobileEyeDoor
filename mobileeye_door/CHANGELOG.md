@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.0.4
+
+- Preload every stream at startup (`preload:` section) so go2rtc keeps each
+  doorbell channel connected instead of reconnecting on demand. Without it the
+  first snapshot after an idle period still hit the ~5s cold-start reconnect,
+  which stacked with Home Assistant's 10s snapshot timeout. Streams now stay
+  warm and snapshots/previews return in ~1-2s.
+- Note: this holds one TCP connection per camera to the doorbell at all times.
+  XiongMai units allow only a few connections, so a phone app opening a 5th may
+  be refused while the add-on runs.
+
 ## 1.0.3
 
 - Real fix for the slow first frame (HTTP 500 on snapshots): cap ffmpeg's input
