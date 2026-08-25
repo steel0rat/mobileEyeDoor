@@ -1,0 +1,13 @@
+# Never commit device secrets or captures
+*.bin
+*.pcap
+*.pcapng
+*.etl
+login_hex.txt
+options.json
+data/
+
+# Python / OS noise
+__pycache__/
+*.pyc
+.DS_Store
