@@ -1,54 +1,56 @@
-# MobileEyeDoor — Home Assistant add-on
+# MobileEyeDoor — дополнение для Home Assistant
 
-Bring **CTV / XiongMai video doorbells** (the *MobileEyeDoor+* / *uCareHome*
-kind, e.g. **CTV-M4101AHD**) into Home Assistant as regular cameras.
+Подключает **видеодомофоны CTV / XiongMai** (те, что работают только с
+приложениями *MobileEyeDoor+* / *uCareHome*, например **CTV-M4101AHD**) к
+Home Assistant обычными камерами.
 
-These doorbells ship **no RTSP and no ONVIF** — video is locked inside a
-proprietary XiongMai protocol on the mobile port (10510) that only the vendor
-apps speak. This repository contains a reverse-engineered bridge that talks
-that protocol, extracts the H.264 stream and republishes it via
-[go2rtc](https://github.com/AlexxIT/go2rtc).
+У таких домофонов **нет ни RTSP, ни ONVIF** — видео заперто в закрытом
+протоколе XiongMai на «мобильном» порту 10510, на котором говорят только
+фирменные приложения. В этом репозитории — мост, собранный обратной
+разработкой протокола: он общается с домофоном напрямую, вытаскивает поток
+H.264 и отдаёт его через [go2rtc](https://github.com/AlexxIT/go2rtc).
 
-## Install
+## Установка
 
-1. In Home Assistant: **Settings → Add-ons → Add-on Store**.
-2. Kebab menu (⋮) → **Repositories** → add:
+1. В Home Assistant: **Настройки → Дополнения → Магазин дополнений**.
+2. Меню «⋮» → **Репозитории** → добавить:
    ```
    https://github.com/steel0rat/mobileEyeDoor
    ```
-3. Install **MobileEyeDoor Bridge**, then configure it — see the
-   [add-on README](mobileeye_door/README.md), especially *Getting your
-   `login_hex`*.
+3. Установить **MobileEyeDoor Bridge** и настроить — см.
+   [README дополнения](mobileeye_door/README.md), в первую очередь раздел
+   «Как получить `login_hex`».
 
-## Repository layout
+## Структура репозитория
 
 ```
-mobileeye_door/     the Home Assistant add-on (bridge + go2rtc)
-  ctv_client.py     XiongMai mobile-protocol client → H.264 on stdout
-  run.sh            generates go2rtc config from add-on options
-  config.yaml       add-on manifest & options
-  Dockerfile        add-on image (python + ffmpeg + go2rtc)
-  README.md         setup & capture recipe
+mobileeye_door/     само дополнение (мост + go2rtc)
+  ctv_client.py     клиент протокола XiongMai → H.264 в stdout
+  run.sh            собирает конфиг go2rtc из настроек дополнения
+  config.yaml       манифест дополнения и его опции
+  Dockerfile        образ (python + ffmpeg + go2rtc)
+  README.md         настройка и рецепт захвата
 tools/
-  extract_login.py  pull the 88-byte login frame out of a packet capture
+  extract_login.py  достаёт 88-байтный кадр входа из дампа трафика
 ```
 
-## The protocol, briefly
+## Коротко о протоколе
 
-Reverse-engineered from captured app traffic (see the add-on README for the
-capture recipe). The client opens TCP to `:10510`, sends one 88-byte login
-frame, and the doorbell immediately streams H.264 for the channel selected by
-**byte 80** (`0x01/0x02/0x04/0x08` for cameras 1–4). The XiongMai media framing
-is stripped down to a clean H.264 Annex-B elementary stream.
+Разобран по перехваченному трафику приложения (рецепт захвата — в README
+дополнения). Клиент открывает TCP к `:10510`, шлёт один 88-байтный кадр
+входа, и домофон сразу отдаёт H.264 для камеры, выбранной **байтом 80**
+(`0x01/0x02/0x04/0x08` для камер 1–4). Обёртка XiongMai снимается до чистого
+элементарного потока H.264 (Annex-B).
 
-The device-specific login secret (username + password hash) is never stored in
-this repo — you supply your own captured `login_hex` in the add-on options.
+Секрет устройства (имя пользователя и хеш пароля) в репозитории не хранится —
+свой захваченный `login_hex` вы указываете в настройках дополнения.
 
-## License
+## Лицензия
 
-MIT — see [LICENSE](LICENSE).
+MIT — см. [LICENSE](LICENSE).
 
-## Disclaimer
+## Оговорка
 
-Independent interoperability work for talking to hardware you own. Not
-affiliated with CTV or XiongMai. No vendor firmware or code is included.
+Независимая работа по совместимости с оборудованием, которым вы владеете. Не
+связано с CTV или XiongMai. Прошивка и код производителя в репозиторий не
+входят.
