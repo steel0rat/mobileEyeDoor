@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.7
+
+- Fix 1.0.6 not starting: `force_key_frames expr:gte(t,n_forced)` contains
+  parentheses, which broke `bash -c` when go2rtc launched the pipeline (syntax
+  error, no producer). Replaced with `-r 15 -g 15` — constant 15 fps and a
+  keyframe every second, no shell metacharacters. CFR also smooths the
+  doorbell's jittery frame rate for WebRTC.
+
 ## 1.0.6
 
 - Fix the stream freezing for 15-30s during playback. The doorbell sends a low,
