@@ -46,12 +46,17 @@ streams:
 EOF
 
 # One go2rtc stream per configured camera. ctv_client emits H.264 Annex-B on
-# stdout, ffmpeg remuxes it (stream copy, no re-encode) into the go2rtc RTSP
-# listener ({output}). The -probesize/-analyzeduration caps are essential: the
-# raw Annex-B stream carries no timestamps and has a low bitrate, so ffmpeg's
-# default stream probe (5 MB) keeps analysing for ~28-40s before it emits the
-# first frame, and snapshots/previews time out. Capping the probe cuts startup
-# to ~2s. The doorbell already sends frequent keyframes, so no re-encode needed.
+# stdout; ffmpeg re-encodes it into the go2rtc RTSP listener ({output}). Two
+# things are essential for a smooth WebRTC/HLS stream:
+#   * -probesize/-analyzeduration caps — the raw Annex-B stream has no
+#     timestamps and a low bitrate, so ffmpeg's default 5 MB probe stalls
+#     ~28-40s before the first frame. Capping it cuts startup to ~2s.
+#   * -use_wallclock_as_timestamps + a forced 1s keyframe — the doorbell sends
+#     a low, VARIABLE frame rate with irregular keyframes (every 3-7s). With
+#     -c:v copy and a fixed -r, players saw bogus timings and, on any packet
+#     loss, froze 15-30s waiting for the next keyframe. Wall-clock PTS fix the
+#     timing; forcing a keyframe every second lets WebRTC recover in ~1s. The
+#     re-encode is tiny (low-fps 640x480, ultrafast) — negligible on any host.
 NAMES=()
 for i in $(bashio::config 'cameras|keys'); do
     CH="$(bashio::config "cameras[${i}].channel")"
@@ -60,7 +65,7 @@ for i in $(bashio::config 'cameras|keys'); do
     bashio::log.info "Camera '${NAME}' -> doorbell channel ${CH}"
     {
         echo "  ${NAME}:"
-        echo "    - \"exec:bash -c 'python3 /ctv_client.py --channel ${CH} | ffmpeg -hide_banner -loglevel error -probesize 32768 -analyzeduration 0 -fflags nobuffer -f h264 -r 25 -i - -c:v copy -rtsp_transport tcp -f rtsp {output}'#killsignal=15\""
+        echo "    - \"exec:bash -c 'python3 /ctv_client.py --channel ${CH} | ffmpeg -hide_banner -loglevel error -probesize 32768 -analyzeduration 0 -use_wallclock_as_timestamps 1 -fflags nobuffer -f h264 -i - -c:v libx264 -preset ultrafast -tune zerolatency -force_key_frames expr:gte(t,n_forced) -pix_fmt yuv420p -an -rtsp_transport tcp -f rtsp {output}'#killsignal=15\""
     } >> "${CONFIG}"
 done
 

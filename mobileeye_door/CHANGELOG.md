@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.6
+
+- Fix the stream freezing for 15-30s during playback. The doorbell sends a low,
+  variable frame rate with irregular keyframes (every 3-7s). The old `-c:v copy`
+  with a fixed `-r 25` fed players bogus timestamps, and on any packet loss they
+  stalled until the next keyframe. Now ffmpeg timestamps by wall-clock
+  (`-use_wallclock_as_timestamps`) and re-encodes with a keyframe forced every
+  second (`-force_key_frames`), so WebRTC/HLS recover within ~1s. The re-encode
+  is negligible (low-fps 640x480, libx264 ultrafast).
+
 ## 1.0.5
 
 - Enable real WebRTC (sub-second latency) instead of the MSE fallback. WebRTC
