@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.3
+
+- Real fix for the slow first frame (HTTP 500 on snapshots): cap ffmpeg's input
+  probe with `-probesize 32768 -analyzeduration 0`. The raw Annex-B stream has
+  no timestamps and a low bitrate, so ffmpeg's default 5 MB probe kept
+  analysing for ~28-40s before emitting a frame. With the cap, startup is ~2s.
+- Revert the 1.0.2 re-encode: the doorbell already sends frequent keyframes, so
+  `-c:v copy` is enough — no CPU cost, original quality. The 1.0.2 GOP theory
+  was wrong; measured first-IDR latency on a fresh connection is 0.5s.
+
 ## 1.0.2
 
 - Re-encode each stream with a 1s keyframe interval (`-g 25`) instead of
