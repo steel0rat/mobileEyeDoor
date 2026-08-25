@@ -35,6 +35,22 @@ import sys
 import time
 
 H264_START = b"\x00\x00\x00\x01"
+
+
+def load_login_hex(value: str) -> str:
+    """Accept a hex string directly, or a path to a file holding the login
+    frame (raw 88 bytes, or a hex/whitespace text dump). Keeping the secret in
+    a file avoids putting the password hash on a command line or in config."""
+    if value and os.path.isfile(value):
+        blob = open(value, "rb").read()
+        text = blob.decode("ascii", "ignore").strip()
+        # hex text dump?
+        cleaned = "".join(text.split())
+        if cleaned and all(c in "0123456789abcdefABCDEF" for c in cleaned):
+            return cleaned
+        # otherwise treat file as raw bytes
+        return blob.hex()
+    return value
 # H.264 NAL unit types that make up a decodable stream.
 KEEP_NAL_TYPES = {1, 5, 6, 7, 8}  # P, IDR, SEI, SPS, PPS
 CHANNEL_MASK = {1: 0x01, 2: 0x02, 3: 0x04, 4: 0x08}
@@ -107,7 +123,7 @@ def main():
     def log(msg):
         print(f"[ctv_client ch{args.channel}] {msg}", file=sys.stderr, flush=True)
 
-    login = build_login(args.login_hex, args.channel)
+    login = build_login(load_login_hex(args.login_hex), args.channel)
     stream(args.host, args.port, login, args.reconnect, log)
 
 
