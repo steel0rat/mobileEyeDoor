@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.1
+
+- Fix H.264 corruption ("grey mush", decode errors): NAL units that straddle
+  TCP recv boundaries are now buffered across reads and only complete units are
+  emitted. Live streams decode cleanly.
+
 ## 1.0.0
 
 - Initial release.

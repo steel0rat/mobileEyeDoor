@@ -70,17 +70,33 @@ def build_login(login_hex: str, channel: int) -> bytes:
     return bytes(frame)
 
 
-def extract_h264(chunk: bytes) -> bytes:
-    """Pull decodable H.264 NAL units out of the XiongMai media framing."""
-    out = bytearray()
-    for part in chunk.split(H264_START)[1:]:
-        if part and (part[0] & 0x1F) in KEEP_NAL_TYPES:
-            out += H264_START + part
-    return bytes(out)
+def emit_complete_nals(buf: bytearray, out) -> None:
+    """Write out every *complete* H.264 NAL unit sitting in ``buf`` and keep the
+    trailing (possibly partial) one in the buffer. NAL units routinely straddle
+    TCP ``recv`` boundaries, so we must accumulate across reads instead of
+    parsing each chunk on its own — otherwise the stream decodes to grey mush.
+    Non-H.264 XiongMai framing (NAL types outside KEEP_NAL_TYPES) is dropped."""
+    # positions of every start code in the buffer
+    starts = []
+    i = buf.find(H264_START)
+    while i != -1:
+        starts.append(i)
+        i = buf.find(H264_START, i + 4)
+    if len(starts) < 2:
+        return  # need at least one boundary after a NAL to know it's complete
+    for a, b in zip(starts, starts[1:]):
+        nal = buf[a:b]
+        payload = nal[4:]
+        if payload and (payload[0] & 0x1F) in KEEP_NAL_TYPES:
+            out.write(nal)
+    out.flush()
+    del buf[:starts[-1]]  # keep the last (still-growing) NAL
 
 
 def stream(host, port, login, reconnect, log):
+    out = sys.stdout.buffer
     while True:
+        buf = bytearray()
         try:
             with socket.create_connection((host, port), timeout=10) as sock:
                 sock.sendall(login)
@@ -91,10 +107,11 @@ def stream(host, port, login, reconnect, log):
                     if not data:
                         log("connection closed by doorbell")
                         break
-                    nal = extract_h264(data)
-                    if nal:
-                        sys.stdout.buffer.write(nal)
-                        sys.stdout.buffer.flush()
+                    buf += data
+                    emit_complete_nals(buf, out)
+                    if len(buf) > 4 * 1024 * 1024:
+                        # runaway (no start codes) — drop to avoid unbounded growth
+                        del buf[:-4]
         except (OSError, ValueError) as exc:
             log(f"stream error: {exc}")
         if not reconnect:
