@@ -51,14 +51,12 @@ EOF
 #   * -probesize/-analyzeduration caps — the raw Annex-B stream has no
 #     timestamps and a low bitrate, so ffmpeg's default 5 MB probe stalls
 #     ~28-40s before the first frame. Capping it cuts startup to ~2s.
-#   * -use_wallclock_as_timestamps + re-encode to constant 15 fps with a
-#     keyframe every second (-r 15 -g 15) — the doorbell sends a low, VARIABLE
-#     frame rate with irregular keyframes (every 3-7s). With -c:v copy and a
-#     fixed -r, players saw bogus timings and, on any packet loss, froze 15-30s
-#     waiting for the next keyframe. Wall-clock PTS fix the timing; a steady CFR
-#     with a 1s keyframe lets WebRTC recover in ~1s. The re-encode is tiny
-#     (640x480, ultrafast) — negligible on any host. (Note: keep the ffmpeg
-#     args free of shell metacharacters like () — go2rtc runs them via bash -c.)
+#   * -c:v copy with NO forced -r — the doorbell sends a low, variable frame
+#     rate. A fixed -r 25 stamped bogus timings (25 fps labels on a ~5 fps
+#     stream), which made players jerk and freeze. Dropping -r lets go2rtc
+#     timestamp packets on arrival, which is smoother. (Re-encoding to insert
+#     regular keyframes was tried but ffmpeg+libx264 on this raw low-fps pipe
+#     wouldn't emit reliably within go2rtc's producer timeout — reverted.)
 NAMES=()
 for i in $(bashio::config 'cameras|keys'); do
     CH="$(bashio::config "cameras[${i}].channel")"
@@ -67,7 +65,7 @@ for i in $(bashio::config 'cameras|keys'); do
     bashio::log.info "Camera '${NAME}' -> doorbell channel ${CH}"
     {
         echo "  ${NAME}:"
-        echo "    - \"exec:bash -c 'python3 /ctv_client.py --channel ${CH} | ffmpeg -hide_banner -loglevel error -probesize 32768 -analyzeduration 0 -use_wallclock_as_timestamps 1 -fflags nobuffer -f h264 -i - -c:v libx264 -preset ultrafast -tune zerolatency -r 15 -g 15 -keyint_min 15 -sc_threshold 0 -pix_fmt yuv420p -an -rtsp_transport tcp -f rtsp {output}'#killsignal=15\""
+        echo "    - \"exec:bash -c 'python3 /ctv_client.py --channel ${CH} | ffmpeg -hide_banner -loglevel error -probesize 32768 -analyzeduration 0 -fflags nobuffer -f h264 -i - -c:v copy -rtsp_transport tcp -f rtsp {output}'#killsignal=15\""
     } >> "${CONFIG}"
 done
 

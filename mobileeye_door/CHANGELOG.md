@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.8
+
+- Revert the 1.0.6/1.0.7 re-encode: ffmpeg+libx264 on the doorbell's raw,
+  low-fps pipe would not emit output within go2rtc's producer timeout (i/o
+  timeout, no stream). Back to `-c:v copy`, which starts reliably.
+- Drop the fixed `-r 25`: the doorbell runs ~5 fps variable, so 25 fps labels
+  gave players bogus timings (a cause of the jerky/freezing playback). Without
+  it go2rtc timestamps packets on arrival — smoother.
+
 ## 1.0.7
 
 - Fix 1.0.6 not starting: `force_key_frames expr:gte(t,n_forced)` contains
