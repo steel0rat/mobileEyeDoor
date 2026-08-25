@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.10
+
+- Fix the real cause of the periodic multi-second freezes: the client demuxed
+  the XiongMai stream by splitting on H.264 start codes alone, which glued
+  stray 16-byte media-packet header bytes onto frames. ffmpeg then hit garbage
+  PPS ids ("pps_id out of range") and stalled 15-30s until the next clean
+  keyframe. Now the client splits on the XiongMai media separator
+  (`02 00 00 00`, impossible inside an H.264 RBSP) and emits clean H.264 —
+  steady playback.
+
 ## 1.0.9
 
 - Fix the jerky/freezing playback for real. The doorbell streams ~3 fps

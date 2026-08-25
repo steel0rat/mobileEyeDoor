@@ -51,8 +51,10 @@ def load_login_hex(value: str) -> str:
         # otherwise treat file as raw bytes
         return blob.hex()
     return value
-# H.264 NAL unit types that make up a decodable stream.
-KEEP_NAL_TYPES = {1, 5, 6, 7, 8}  # P, IDR, SEI, SPS, PPS
+# XiongMai wraps each H.264 access unit in a media packet whose 16-byte header
+# starts with these 4 bytes. `00 00 00` can't appear inside an H.264 RBSP
+# (emulation prevention guarantees it), so this is a reliable packet separator.
+XM_MEDIA_SEP = b"\x02\x00\x00\x00"
 CHANNEL_MASK = {1: 0x01, 2: 0x02, 3: 0x04, 4: 0x08}
 LOGIN_CHANNEL_OFFSET = 80
 
@@ -71,26 +73,29 @@ def build_login(login_hex: str, channel: int) -> bytes:
 
 
 def emit_complete_nals(buf: bytearray, out) -> None:
-    """Write out every *complete* H.264 NAL unit sitting in ``buf`` and keep the
-    trailing (possibly partial) one in the buffer. NAL units routinely straddle
-    TCP ``recv`` boundaries, so we must accumulate across reads instead of
-    parsing each chunk on its own — otherwise the stream decodes to grey mush.
-    Non-H.264 XiongMai framing (NAL types outside KEEP_NAL_TYPES) is dropped."""
-    # positions of every start code in the buffer
-    starts = []
-    i = buf.find(H264_START)
-    while i != -1:
-        starts.append(i)
-        i = buf.find(H264_START, i + 4)
-    if len(starts) < 2:
-        return  # need at least one boundary after a NAL to know it's complete
-    for a, b in zip(starts, starts[1:]):
-        nal = buf[a:b]
-        payload = nal[4:]
-        if payload and (payload[0] & 0x1F) in KEEP_NAL_TYPES:
-            out.write(nal)
+    """Demux the XiongMai media stream in ``buf`` into clean H.264 on ``out``.
+
+    Each media packet is a 16-byte header (starting with ``XM_MEDIA_SEP``)
+    followed by an H.264 access unit. We split on the separator, skip each
+    header up to its first NAL start code, and emit the raw H.264 payload. The
+    trailing (possibly partial) packet stays buffered, because packets straddle
+    TCP ``recv`` boundaries.
+
+    An earlier version split on H.264 start codes alone and glued stray header
+    bytes onto frames; ffmpeg then read garbage PPS ids ("pps_id out of range")
+    and stalled for tens of seconds. Splitting on the media separator keeps the
+    payload clean and the stream steady."""
+    parts = bytes(buf).split(XM_MEDIA_SEP)
+    if len(parts) < 2:
+        return  # no complete packet yet
+    for part in parts[1:-1]:  # complete packets; the last may still be growing
+        idx = part.find(H264_START)
+        if idx != -1:
+            out.write(part[idx:])
     out.flush()
-    del buf[:starts[-1]]  # keep the last (still-growing) NAL
+    last = buf.rfind(XM_MEDIA_SEP)
+    if last > 0:
+        del buf[:last]  # keep the trailing partial packet
 
 
 def stream(host, port, login, reconnect, log):
