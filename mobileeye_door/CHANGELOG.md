@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.9
+
+- Fix the jerky/freezing playback for real. The doorbell streams ~3 fps
+  (measured) with no timestamps; ffmpeg was labeling it 25 fps, so players
+  starved and stalled. Add `-use_wallclock_as_timestamps` so each frame is
+  stamped by real arrival time — go2rtc/WebRTC now pace correctly and play
+  smoothly. (It looked broken in 1.0.6-1.0.8 only because the doorbell was tied
+  up by the earlier retry loop; on a free connection wall-clock copy works.)
+
 ## 1.0.8
 
 - Revert the 1.0.6/1.0.7 re-encode: ffmpeg+libx264 on the doorbell's raw,

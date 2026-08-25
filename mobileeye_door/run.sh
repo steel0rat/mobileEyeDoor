@@ -51,12 +51,13 @@ EOF
 #   * -probesize/-analyzeduration caps — the raw Annex-B stream has no
 #     timestamps and a low bitrate, so ffmpeg's default 5 MB probe stalls
 #     ~28-40s before the first frame. Capping it cuts startup to ~2s.
-#   * -c:v copy with NO forced -r — the doorbell sends a low, variable frame
-#     rate. A fixed -r 25 stamped bogus timings (25 fps labels on a ~5 fps
-#     stream), which made players jerk and freeze. Dropping -r lets go2rtc
-#     timestamp packets on arrival, which is smoother. (Re-encoding to insert
-#     regular keyframes was tried but ffmpeg+libx264 on this raw low-fps pipe
-#     wouldn't emit reliably within go2rtc's producer timeout — reverted.)
+#   * -use_wallclock_as_timestamps + -c:v copy — the doorbell streams a low
+#     ~3 fps variable rate with no timestamps. Left alone, ffmpeg labels the raw
+#     H.264 at 25 fps, so players expect 25 fps, get ~3, starve, and freeze
+#     (play 1-2s, stall waiting). Wall-clock timestamps stamp each frame by its
+#     real arrival time, so go2rtc/WebRTC get correct pacing and play smoothly.
+#     (Re-encoding to add regular keyframes was tried but ffmpeg+libx264 on this
+#     raw low-fps pipe wouldn't emit within go2rtc's producer timeout.)
 NAMES=()
 for i in $(bashio::config 'cameras|keys'); do
     CH="$(bashio::config "cameras[${i}].channel")"
@@ -65,7 +66,7 @@ for i in $(bashio::config 'cameras|keys'); do
     bashio::log.info "Camera '${NAME}' -> doorbell channel ${CH}"
     {
         echo "  ${NAME}:"
-        echo "    - \"exec:bash -c 'python3 /ctv_client.py --channel ${CH} | ffmpeg -hide_banner -loglevel error -probesize 32768 -analyzeduration 0 -fflags nobuffer -f h264 -i - -c:v copy -rtsp_transport tcp -f rtsp {output}'#killsignal=15\""
+        echo "    - \"exec:bash -c 'python3 /ctv_client.py --channel ${CH} | ffmpeg -hide_banner -loglevel error -probesize 32768 -analyzeduration 0 -use_wallclock_as_timestamps 1 -fflags nobuffer -f h264 -i - -c:v copy -rtsp_transport tcp -f rtsp {output}'#killsignal=15\""
     } >> "${CONFIG}"
 done
 
